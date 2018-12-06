@@ -1,0 +1,50 @@
+version: '3.7'
+services:
+  seafile:
+    image: pedroetb/seafile-arm:${IMAGE_TAG:-latest}
+    environment:
+      - SEAFILE_SERVER_HOSTNAME
+      - SEAFILE_ADMIN_EMAIL
+      - SEAFILE_ADMIN_PASSWORD
+      - SEAFILE_SERVER_LETSENCRYPT
+    networks:
+      - traefik-net
+    volumes:
+      - data-vol:/shared/seafile
+      - db-vol:/shared/db
+      - logs-vol:/shared/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        traefik.docker.network: traefik-net
+        traefik.frontend.rule: Host:${SEAFILE_SERVER_HOSTNAME}
+        traefik.backend: seafile
+        traefik.port: "80"
+      restart_policy:
+        delay: 10s
+        window: 1m
+      resources:
+        limits:
+          cpus: '2'
+          memory: 256M
+        reservations:
+          memory: 205M
+
+networks:
+  traefik-net:
+    external: true
+
+volumes:
+  data-vol:
+    driver: local
+    driver_opts:
+      type: ${DATA_VOLUME_TYPE}
+      o: ${DATA_VOLUME_OPTIONS}
+      device: ${DATA_VOLUME_DEVICE}
+
+  db-vol:
+    name: seafile-db-vol
+
+  logs-vol:
+    name: seafile-logs-vol
