@@ -1,4 +1,5 @@
 version: '3.7'
+
 services:
   seafile:
     image: ${IMAGE_NAME:-seafileltd/seafile}:${IMAGE_TAG:-latest}
@@ -13,38 +14,45 @@ services:
       - data-vol:/shared/seafile
       - db-vol:/shared/db
       - logs-vol:/shared/logs
+    healthcheck:
+      test: wget --spider -nv -t 3 http://localhost
+      interval: ${SEAFILE_HEALTHCHECK_INTERVAL}
+      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT}
+      retries: ${SEAFILE_HEALTHCHECK_RETRIES}
+      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD}
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: ${SEAFILE_REPLICAS}
       labels:
-        traefik.docker.network: traefik-net
         traefik.frontend.rule: Host:${SEAFILE_SERVER_HOSTNAME}
         traefik.backend: seafile
-        traefik.port: "80"
+        traefik.port: '80'
       restart_policy:
-        delay: 10s
-        window: 1m
+        delay: ${SEAFILE_RESTART_POLICY_DELAY}
+        window: ${SEAFILE_RESTART_POLICY_WINDOW}
       resources:
         limits:
-          cpus: '2'
-          memory: 256M
+          cpus: "${SEAFILE_LIMITS_CPUS}"
+          memory: ${SEAFILE_LIMITS_MEMORY}
         reservations:
-          memory: 205M
+          memory: ${SEAFILE_RESERVATIONS_MEMORY}
 
 networks:
   traefik-net:
+    name: ${TRAEFIK_NET_NAME:-traefik-net}
     external: true
 
 volumes:
   data-vol:
+    name: ${SEAFILE_DATA_VOL_NAME:-seafile-data-vol}
     driver: local
     driver_opts:
-      type: ${DATA_VOLUME_TYPE}
-      o: ${DATA_VOLUME_OPTIONS}
-      device: ${DATA_VOLUME_DEVICE}
+      type: ${SEAFILE_DATA_VOLUME_TYPE}
+      o: ${SEAFILE_DATA_VOLUME_OPTIONS}
+      device: ${SEAFILE_DATA_VOLUME_DEVICE}
 
   db-vol:
-    name: seafile-db-vol
+    name: ${SEAFILE_DB_VOL_NAME:-seafile-db-vol}
 
   logs-vol:
-    name: seafile-logs-vol
+    name: ${SEAFILE_LOGS_VOL_NAME:-seafile-logs-vol}
