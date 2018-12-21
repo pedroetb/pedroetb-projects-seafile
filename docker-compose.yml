@@ -10,36 +10,41 @@ services:
       - SEAFILE_SERVER_LETSENCRYPT
     networks:
       - traefik-net
+      - mail-net
     volumes:
       - data-vol:/shared/seafile
       - db-vol:/shared/db
       - logs-vol:/shared/logs
     healthcheck:
       test: wget --spider -nv -t 3 http://localhost
-      interval: ${SEAFILE_HEALTHCHECK_INTERVAL}
-      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT}
-      retries: ${SEAFILE_HEALTHCHECK_RETRIES}
-      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD}
+      interval: ${SEAFILE_HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-1m}
+      retries: ${SEAFILE_HEALTHCHECK_RETRIES:-3}
+      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-1m}
     deploy:
       mode: replicated
-      replicas: ${SEAFILE_REPLICAS}
+      replicas: ${SEAFILE_REPLICAS:-1}
       labels:
         traefik.frontend.rule: Host:${SEAFILE_SERVER_HOSTNAME}
         traefik.backend: seafile
         traefik.port: '80'
       restart_policy:
-        delay: ${SEAFILE_RESTART_POLICY_DELAY}
-        window: ${SEAFILE_RESTART_POLICY_WINDOW}
+        delay: ${SEAFILE_RESTART_POLICY_DELAY:-10s}
+        window: ${SEAFILE_RESTART_POLICY_WINDOW:-1m}
       resources:
         limits:
-          cpus: "${SEAFILE_LIMITS_CPUS}"
-          memory: ${SEAFILE_LIMITS_MEMORY}
+          cpus: "${SEAFILE_LIMITS_CPUS:-2}"
+          memory: ${SEAFILE_LIMITS_MEMORY:-384M}
         reservations:
-          memory: ${SEAFILE_RESERVATIONS_MEMORY}
+          memory: ${SEAFILE_RESERVATIONS_MEMORY:-200M}
 
 networks:
   traefik-net:
     name: ${TRAEFIK_NET_NAME:-traefik-net}
+    external: true
+
+  mail-net:
+    name: ${MAIL_NET_NAME:-mail-net}
     external: true
 
 volumes:
