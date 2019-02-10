@@ -16,11 +16,11 @@ services:
       - db-vol:/shared/db
       - logs-vol:/shared/logs
     healthcheck:
-      test: wget --spider -nv -t 3 http://localhost
+      test: wget --spider -nv http://localhost
       interval: ${SEAFILE_HEALTHCHECK_INTERVAL:-30s}
-      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-1m}
+      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-15s}
       retries: ${SEAFILE_HEALTHCHECK_RETRIES:-3}
-      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-1m}
+      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-2m}
     deploy:
       mode: replicated
       replicas: ${SEAFILE_REPLICAS:-1}
@@ -58,6 +58,11 @@ volumes:
 
   db-vol:
     name: ${SEAFILE_DB_VOL_NAME:-seafile-db-vol}
+    driver: local
+    driver_opts:
+      type: ${SEAFILE_DB_VOLUME_TYPE}
+      o: ${SEAFILE_DB_VOLUME_OPTIONS}
+      device: ${SEAFILE_DB_VOLUME_DEVICE}
 
   logs-vol:
     name: ${SEAFILE_LOGS_VOL_NAME:-seafile-logs-vol}
