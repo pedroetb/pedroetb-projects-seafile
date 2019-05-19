@@ -4,10 +4,10 @@ services:
   seafile:
     image: ${IMAGE_NAME:-seafileltd/seafile}:${IMAGE_TAG:-latest}
     environment:
-      - SEAFILE_SERVER_HOSTNAME
-      - SEAFILE_ADMIN_EMAIL
-      - SEAFILE_ADMIN_PASSWORD
-      - SEAFILE_SERVER_LETSENCRYPT
+      SEAFILE_SERVER_HOSTNAME:
+      SEAFILE_ADMIN_EMAIL:
+      SEAFILE_ADMIN_PASSWORD:
+      SEAFILE_SERVER_LETSENCRYPT:
     networks:
       - traefik-net
       - mail-net
@@ -33,9 +33,10 @@ services:
         window: ${SEAFILE_RESTART_POLICY_WINDOW:-1m}
       resources:
         limits:
-          cpus: "${SEAFILE_LIMITS_CPUS:-2}"
+          cpus: '${SEAFILE_LIMITS_CPUS:-2}'
           memory: ${SEAFILE_LIMITS_MEMORY:-384M}
         reservations:
+          cpus: '${SEAFILE_RESERVATIONS_CPUS:-0.001}'
           memory: ${SEAFILE_RESERVATIONS_MEMORY:-200M}
 
 networks:
