@@ -9,35 +9,37 @@ services:
       SEAFILE_ADMIN_PASSWORD:
       SEAFILE_SERVER_LETSENCRYPT:
     networks:
-      - traefik-net
-      - mail-net
+      traefik-net:
+      mail-net:
     volumes:
       - data-vol:/shared/seafile
       - db-vol:/shared/db
       - logs-vol:/shared/logs
     healthcheck:
       test: wget --spider -nv http://localhost
-      interval: ${SEAFILE_HEALTHCHECK_INTERVAL:-30s}
-      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-15s}
-      retries: ${SEAFILE_HEALTHCHECK_RETRIES:-3}
-      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-2m}
+      interval: ${HEALTHCHECK_INTERVAL:-1m}
+      timeout: ${HEALTHCHECK_TIMEOUT:-15s}
+      retries: ${HEALTHCHECK_RETRIES:-10}
+      start_period: ${HEALTHCHECK_START_PERIOD:-3m}
     deploy:
       mode: replicated
-      replicas: ${SEAFILE_REPLICAS:-1}
-      labels:
-        traefik.frontend.rule: Host:${SEAFILE_SERVER_HOSTNAME}
-        traefik.backend: seafile
-        traefik.port: '80'
+      replicas: ${REPLICAS:-1}
       restart_policy:
-        delay: ${SEAFILE_RESTART_POLICY_DELAY:-10s}
-        window: ${SEAFILE_RESTART_POLICY_WINDOW:-1m}
+        delay: ${RESTART_DELAY:-10s}
+      update_config:
+        delay: ${UPDATE_DELAY:-1m}
+      labels:
+        traefik.http.routers.seafile.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+        traefik.http.routers.seafile.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile.rule: Host(`${SEAFILE_SERVER_HOSTNAME}`)
+        traefik.http.services.seafile.loadbalancer.server.port: ${PORT:-80}
       resources:
         limits:
-          cpus: '${SEAFILE_LIMITS_CPUS:-2}'
-          memory: ${SEAFILE_LIMITS_MEMORY:-384M}
+          cpus: '${RESOURCES_LIMITS_CPUS:-2}'
+          memory: ${RESOURCES_LIMITS_MEMORY:-384M}
         reservations:
-          cpus: '${SEAFILE_RESERVATIONS_CPUS:-0.001}'
-          memory: ${SEAFILE_RESERVATIONS_MEMORY:-200M}
+          cpus: '${RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          memory: ${RESOURCES_RESERVATIONS_MEMORY:-200M}
 
 networks:
   traefik-net:
@@ -50,20 +52,20 @@ networks:
 
 volumes:
   data-vol:
-    name: ${SEAFILE_DATA_VOL_NAME:-seafile-data-vol}
+    name: ${DATA_VOL_NAME:-seafile-data-vol}
     driver: local
     driver_opts:
-      type: ${SEAFILE_DATA_VOLUME_TYPE}
-      o: ${SEAFILE_DATA_VOLUME_OPTIONS}
-      device: ${SEAFILE_DATA_VOLUME_DEVICE}
+      type: ${DATA_VOL_TYPE:-nfs}
+      o: ${DATA_VOL_OPTIONS}
+      device: ${DATA_VOL_DEVICE:-:/seafile-data-vol/}
 
   db-vol:
-    name: ${SEAFILE_DB_VOL_NAME:-seafile-db-vol}
+    name: ${DB_VOL_NAME:-seafile-db-vol}
     driver: local
     driver_opts:
-      type: ${SEAFILE_DB_VOLUME_TYPE}
-      o: ${SEAFILE_DB_VOLUME_OPTIONS}
-      device: ${SEAFILE_DB_VOLUME_DEVICE}
+      type: ${DB_VOL_TYPE:-nfs}
+      o: ${DB_VOL_OPTIONS}
+      device: ${DB_VOL_DEVICE:-:/seafile-db-vol/}
 
   logs-vol:
-    name: ${SEAFILE_LOGS_VOL_NAME:-seafile-logs-vol}
+    name: ${LOGS_VOL_NAME:-seafile-logs-vol}
