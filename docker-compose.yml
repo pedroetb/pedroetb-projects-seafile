@@ -4,7 +4,7 @@ services:
   seafile:
     image: ${IMAGE_NAME:-seafileltd/seafile}:${IMAGE_TAG:-latest}
     environment:
-      SEAFILE_SERVER_HOSTNAME:
+      SEAFILE_SERVER_HOSTNAME: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
       SEAFILE_ADMIN_EMAIL:
       SEAFILE_ADMIN_PASSWORD:
       SEAFILE_SERVER_LETSENCRYPT:
@@ -29,25 +29,28 @@ services:
       update_config:
         delay: ${UPDATE_DELAY:-1m}
       labels:
+        traefik.enable: 'true'
         traefik.http.routers.seafile.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
         traefik.http.routers.seafile.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
-        traefik.http.routers.seafile.rule: Host(`${SEAFILE_SERVER_HOSTNAME}`)
+        traefik.http.routers.seafile.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
         traefik.http.services.seafile.loadbalancer.server.port: ${PORT:-80}
       resources:
         limits:
           cpus: '${RESOURCES_LIMITS_CPUS:-2}'
-          memory: ${RESOURCES_LIMITS_MEMORY:-384M}
+          memory: ${RESOURCES_LIMITS_MEMORY:-512M}
         reservations:
           cpus: '${RESOURCES_RESERVATIONS_CPUS:-0.001}'
-          memory: ${RESOURCES_RESERVATIONS_MEMORY:-200M}
+          memory: ${RESOURCES_RESERVATIONS_MEMORY:-256M}
 
 networks:
   traefik-net:
     name: ${TRAEFIK_NET_NAME:-traefik-net}
+    driver: ${TRAEFIK_NET_DRIVER:-overlay}
     external: true
 
   mail-net:
     name: ${MAIL_NET_NAME:-mail-net}
+    driver: ${MAIL_NET_DRIVER:-overlay}
     external: true
 
 volumes:
@@ -63,7 +66,7 @@ volumes:
     name: ${DB_VOL_NAME:-seafile-db-vol}
     driver: local
     driver_opts:
-      type: ${DB_VOL_TYPE:-nfs}
+      type: ${DB_VOL_TYPE:-nfs4}
       o: ${DB_VOL_OPTIONS}
       device: ${DB_VOL_DEVICE:-:/seafile-db-vol/}
 
