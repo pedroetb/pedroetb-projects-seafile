@@ -18,12 +18,6 @@ services:
       mail-net:
     volumes:
       - data-vol:/shared
-    healthcheck:
-      test: wget --spider -nv http://localhost
-      interval: ${SEAFILE_HEALTHCHECK_INTERVAL:-1m}
-      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-15s}
-      retries: ${SEAFILE_HEALTHCHECK_RETRIES:-10}
-      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-3m}
     deploy:
       mode: replicated
       replicas: ${SEAFILE_REPLICAS:-1}
