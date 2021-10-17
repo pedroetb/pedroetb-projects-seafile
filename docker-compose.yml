@@ -1,48 +1,83 @@
-version: '3.7'
+version: '3.8'
 
 services:
-  seafile:
-    image: ${IMAGE_NAME:-seafileltd/seafile}:${IMAGE_TAG:-latest}
+  seafile-mc:
+    image: ${SEAFILE_IMAGE_NAME:-franchetti/seafile-arm}:${SEAFILE_IMAGE_TAG:-latest}
     environment:
-      SEAFILE_SERVER_HOSTNAME: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
+      SERVER_IP: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
       SEAFILE_ADMIN_EMAIL:
       SEAFILE_ADMIN_PASSWORD:
-      SEAFILE_SERVER_LETSENCRYPT:
+      MYSQL_HOST: ${MARIADB_ALIAS}
+      MYSQL_USER:
+      MYSQL_USER_PASSWD:
+      MYSQL_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
+      TZ:
     networks:
+      seafile-net:
       traefik-net:
       mail-net:
     volumes:
-      - data-vol:/shared/seafile
-      - db-vol:/shared/db
-      - logs-vol:/shared/logs
+      - data-vol:/shared
     healthcheck:
       test: wget --spider -nv http://localhost
-      interval: ${HEALTHCHECK_INTERVAL:-1m}
-      timeout: ${HEALTHCHECK_TIMEOUT:-15s}
-      retries: ${HEALTHCHECK_RETRIES:-10}
-      start_period: ${HEALTHCHECK_START_PERIOD:-3m}
+      interval: ${SEAFILE_HEALTHCHECK_INTERVAL:-1m}
+      timeout: ${SEAFILE_HEALTHCHECK_TIMEOUT:-15s}
+      retries: ${SEAFILE_HEALTHCHECK_RETRIES:-10}
+      start_period: ${SEAFILE_HEALTHCHECK_START_PERIOD:-3m}
     deploy:
       mode: replicated
-      replicas: ${REPLICAS:-1}
+      replicas: ${SEAFILE_REPLICAS:-1}
       restart_policy:
-        delay: ${RESTART_DELAY:-10s}
+        delay: ${SEAFILE_RESTART_DELAY:-10s}
       update_config:
-        delay: ${UPDATE_DELAY:-1m}
+        delay: ${SEAFILE_UPDATE_DELAY:-1m}
       labels:
         traefik.enable: 'true'
         traefik.http.routers.seafile.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
         traefik.http.routers.seafile.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
         traefik.http.routers.seafile.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
-        traefik.http.services.seafile.loadbalancer.server.port: ${PORT:-80}
+        traefik.http.services.seafile.loadbalancer.server.port: ${SEAFILE_PORT:-80}
       resources:
         limits:
-          cpus: '${RESOURCES_LIMITS_CPUS:-2}'
-          memory: ${RESOURCES_LIMITS_MEMORY:-512M}
+          cpus: '${SEAFILE_RESOURCES_LIMITS_CPUS:-2}'
+          memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-512M}
         reservations:
-          cpus: '${RESOURCES_RESERVATIONS_CPUS:-0.001}'
-          memory: ${RESOURCES_RESERVATIONS_MEMORY:-256M}
+          cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-256M}
+
+  mariadb:
+    image: ${MARIADB_IMAGE_NAME:-linuxserver/mariadb}:${MARIADB_IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD:
+      TZ:
+    networks:
+      seafile-net:
+        aliases:
+          - ${MARIADB_ALIAS}
+    volumes:
+      - db-vol:/config
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        delay: ${MARIADB_RESTART_DELAY:-5s}
+      update_config:
+        delay: ${MARIADB_UPDATE_DELAY:-1m}
+      resources:
+        limits:
+          cpus: '${MARIADB_RESOURCES_LIMITS_CPUS:-0.5}'
+          memory: ${MARIADB_RESOURCES_LIMITS_MEMORY:-128M}
+        reservations:
+          cpus: '${MARIADB_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          memory: ${MARIADB_RESOURCES_RESERVATIONS_MEMORY:-64M}
 
 networks:
+  seafile-net:
+    name: ${SEAFILE_NET_NAME:-traefik-net}
+    driver: ${SEAFILE_NET_DRIVER:-overlay}
+    attachable: ${SEAFILE_NET_ATTACHABLE:-true}
+
   traefik-net:
     name: ${TRAEFIK_NET_NAME:-traefik-net}
     driver: ${TRAEFIK_NET_DRIVER:-overlay}
@@ -55,20 +90,17 @@ networks:
 
 volumes:
   data-vol:
-    name: ${DATA_VOL_NAME:-seafile-data-vol}
+    name: ${DATA_VOL_NAME:-seafile-shared-vol}
     driver: local
     driver_opts:
       type: ${DATA_VOL_TYPE:-nfs}
-      o: ${DATA_VOL_OPTIONS}
-      device: ${DATA_VOL_DEVICE:-:/seafile-data-vol/}
+      o: addr=${DATA_VOL_ADDR},${VOL_OPTIONS}
+      device: ${DATA_VOL_DEVICE:-:/seafile-shared-vol/}
 
   db-vol:
-    name: ${DB_VOL_NAME:-seafile-db-vol}
+    name: ${DB_VOL_NAME:-seafile-mariadb-vol}
     driver: local
     driver_opts:
       type: ${DB_VOL_TYPE:-nfs4}
-      o: ${DB_VOL_OPTIONS}
-      device: ${DB_VOL_DEVICE:-:/seafile-db-vol/}
-
-  logs-vol:
-    name: ${LOGS_VOL_NAME:-seafile-logs-vol}
+      o: addr=${DB_VOL_ADDR},${VOL_OPTIONS}
+      device: ${DB_VOL_DEVICE:-:/seafile-mariadb-vol/}
