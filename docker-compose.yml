@@ -74,7 +74,7 @@ services:
 
 networks:
   seafile-net:
-    name: ${SEAFILE_NET_NAME:-traefik-net}
+    name: ${SEAFILE_NET_NAME:-seafile-net}
     driver: ${SEAFILE_NET_DRIVER:-overlay}
     attachable: ${SEAFILE_NET_ATTACHABLE:-true}
 
