@@ -1,48 +1,91 @@
-version: '3.7'
+version: '3.8'
 
 services:
-  seafile:
-    image: ${IMAGE_NAME:-seafileltd/seafile}:${IMAGE_TAG:-latest}
+  seafile-mc:
+    image: ${SEAFILE_IMAGE_NAME:-franchetti/seafile-arm}:${SEAFILE_IMAGE_TAG:-latest}
     environment:
-      SEAFILE_SERVER_HOSTNAME: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
+      TZ:
+      SERVER_IP: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
+      USE_HTTPS:
       SEAFILE_ADMIN_EMAIL:
       SEAFILE_ADMIN_PASSWORD:
-      SEAFILE_SERVER_LETSENCRYPT:
+      MYSQL_HOST: ${MARIADB_ALIAS}
+      MYSQL_USER:
+      MYSQL_USER_PASSWD:
+      MYSQL_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
     networks:
+      seafile-net:
       traefik-net:
       mail-net:
     volumes:
-      - data-vol:/shared/seafile
-      - db-vol:/shared/db
+      - data-vol:/shared/seafile-data
+      - seahub-vol:/shared/seahub-data
+      - conf-vol:/shared/conf
       - logs-vol:/shared/logs
-    healthcheck:
-      test: wget --spider -nv http://localhost
-      interval: ${HEALTHCHECK_INTERVAL:-1m}
-      timeout: ${HEALTHCHECK_TIMEOUT:-15s}
-      retries: ${HEALTHCHECK_RETRIES:-10}
-      start_period: ${HEALTHCHECK_START_PERIOD:-3m}
+      - media-vol:/shared/media
     deploy:
       mode: replicated
-      replicas: ${REPLICAS:-1}
+      replicas: ${SEAFILE_REPLICAS:-1}
       restart_policy:
-        delay: ${RESTART_DELAY:-10s}
+        delay: ${SEAFILE_RESTART_DELAY:-10s}
       update_config:
-        delay: ${UPDATE_DELAY:-1m}
+        delay: ${SEAFILE_UPDATE_DELAY:-1m}
       labels:
         traefik.enable: 'true'
-        traefik.http.routers.seafile.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
-        traefik.http.routers.seafile.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
-        traefik.http.routers.seafile.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
-        traefik.http.services.seafile.loadbalancer.server.port: ${PORT:-80}
+        traefik.http.routers.seafile-seahub.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+        traefik.http.routers.seafile-seahub.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile-seahub.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
+        traefik.http.routers.seafile-seahub.service: seafile-seahub
+        traefik.http.services.seafile-seahub.loadbalancer.server.port: ${SEAFILE_SEAHUB_PORT:-8000}
+        traefik.http.routers.seafile-fileserver.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+        traefik.http.routers.seafile-fileserver.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile-fileserver.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`) && PathPrefix(`/seafhttp/`)
+        traefik.http.routers.seafile-fileserver.service: seafile-fileserver
+        traefik.http.services.seafile-fileserver.loadbalancer.server.port: ${SEAFILE_FILESERVER_PORT:-8082}
+        traefik.http.middlewares.seafhttp-replace.replacepathregex.regex: ^/seafhttp/(.*)
+        traefik.http.middlewares.seafhttp-replace.replacepathregex.replacement: /$$1
+        traefik.http.routers.seafile-fileserver.middlewares: seafhttp-replace
       resources:
         limits:
-          cpus: '${RESOURCES_LIMITS_CPUS:-2}'
-          memory: ${RESOURCES_LIMITS_MEMORY:-512M}
+          cpus: '${SEAFILE_RESOURCES_LIMITS_CPUS:-2}'
+          memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-512M}
         reservations:
-          cpus: '${RESOURCES_RESERVATIONS_CPUS:-0.001}'
-          memory: ${RESOURCES_RESERVATIONS_MEMORY:-256M}
+          cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-128M}
+
+  mariadb:
+    image: ${MARIADB_IMAGE_NAME:-linuxserver/mariadb}:${MARIADB_IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      TZ:
+      MYSQL_ROOT_PASSWORD:
+    networks:
+      seafile-net:
+        aliases:
+          - ${MARIADB_ALIAS}
+    volumes:
+      - db-vol:/config
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        delay: ${MARIADB_RESTART_DELAY:-5s}
+      update_config:
+        delay: ${MARIADB_UPDATE_DELAY:-1m}
+      resources:
+        limits:
+          cpus: '${MARIADB_RESOURCES_LIMITS_CPUS:-0.5}'
+          memory: ${MARIADB_RESOURCES_LIMITS_MEMORY:-128M}
+        reservations:
+          cpus: '${MARIADB_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          memory: ${MARIADB_RESOURCES_RESERVATIONS_MEMORY:-64M}
 
 networks:
+  seafile-net:
+    name: ${SEAFILE_NET_NAME:-seafile-net}
+    driver: ${SEAFILE_NET_DRIVER:-overlay}
+    attachable: ${SEAFILE_NET_ATTACHABLE:-true}
+
   traefik-net:
     name: ${TRAEFIK_NET_NAME:-traefik-net}
     driver: ${TRAEFIK_NET_DRIVER:-overlay}
@@ -55,20 +98,49 @@ networks:
 
 volumes:
   data-vol:
-    name: ${DATA_VOL_NAME:-seafile-data-vol}
+    name: ${DATA_VOL_NAME:-seafile-mc-data-vol}
     driver: local
     driver_opts:
-      type: ${DATA_VOL_TYPE:-nfs}
-      o: ${DATA_VOL_OPTIONS}
-      device: ${DATA_VOL_DEVICE:-:/seafile-data-vol/}
+      type: ${DATA_VOL_TYPE}
+      o: addr=${DATA_VOL_ADDR},${VOL_OPTIONS}
+      device: ${DATA_VOL_DEVICE:-:/seafile-mc-data-vol/}
 
-  db-vol:
-    name: ${DB_VOL_NAME:-seafile-db-vol}
+  seahub-vol:
+    name: ${SEAHUB_VOL_NAME:-seafile-mc-seahub-vol}
     driver: local
     driver_opts:
-      type: ${DB_VOL_TYPE:-nfs4}
-      o: ${DB_VOL_OPTIONS}
-      device: ${DB_VOL_DEVICE:-:/seafile-db-vol/}
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${SEAHUB_VOL_DEVICE:-:/seafile-mc-seahub-vol/}
+
+  conf-vol:
+    name: ${CONF_VOL_NAME:-seafile-mc-conf-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${CONF_VOL_DEVICE:-:/seafile-mc-conf-vol/}
 
   logs-vol:
-    name: ${LOGS_VOL_NAME:-seafile-logs-vol}
+    name: ${LOGS_VOL_NAME:-seafile-mc-logs-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${LOGS_VOL_DEVICE:-:/seafile-mc-logs-vol/}
+
+  media-vol:
+    name: ${MEDIA_VOL_NAME:-seafile-mc-media-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${MEDIA_VOL_DEVICE:-:/seafile-mc-media-vol/}
+
+  db-vol:
+    name: ${DB_VOL_NAME:-seafile-mc-db-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${DB_VOL_DEVICE:-:/seafile-mc-db-vol/}
