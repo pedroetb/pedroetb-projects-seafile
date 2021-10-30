@@ -4,20 +4,25 @@ services:
   seafile-mc:
     image: ${SEAFILE_IMAGE_NAME:-franchetti/seafile-arm}:${SEAFILE_IMAGE_TAG:-latest}
     environment:
+      TZ:
       SERVER_IP: ${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}
+      USE_HTTPS:
       SEAFILE_ADMIN_EMAIL:
       SEAFILE_ADMIN_PASSWORD:
       MYSQL_HOST: ${MARIADB_ALIAS}
       MYSQL_USER:
       MYSQL_USER_PASSWD:
       MYSQL_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
-      TZ:
     networks:
       seafile-net:
       traefik-net:
       mail-net:
     volumes:
-      - data-vol:/shared
+      - data-vol:/shared/seafile-data
+      - seahub-vol:/shared/seahub-data
+      - conf-vol:/shared/conf
+      - logs-vol:/shared/logs
+      - media-vol:/shared/media
     deploy:
       mode: replicated
       replicas: ${SEAFILE_REPLICAS:-1}
@@ -27,33 +32,33 @@ services:
         delay: ${SEAFILE_UPDATE_DELAY:-1m}
       labels:
         traefik.enable: 'true'
-        traefik.http.routers.seafile-mc.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
-        traefik.http.routers.seafile-mc.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
-        traefik.http.routers.seafile-mc.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
-        traefik.http.routers.seafile-mc.service: seafile-mc
-        traefik.http.services.seafile-mc.loadbalancer.server.port: ${SEAFILE_MC_PORT:-8000}
-        traefik.http.routers.seafile-files.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
-        traefik.http.routers.seafile-files.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
-        traefik.http.routers.seafile-files.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`) && PathPrefix(`/seafhttp/`)
-        traefik.http.routers.seafile-files.service: seafile-files
-        traefik.http.services.seafile-files.loadbalancer.server.port: ${SEAFILE_FILES_PORT:-8082}
+        traefik.http.routers.seafile-seahub.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+        traefik.http.routers.seafile-seahub.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile-seahub.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
+        traefik.http.routers.seafile-seahub.service: seafile-seahub
+        traefik.http.services.seafile-seahub.loadbalancer.server.port: ${SEAFILE_SEAHUB_PORT:-8000}
+        traefik.http.routers.seafile-fileserver.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+        traefik.http.routers.seafile-fileserver.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile-fileserver.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`) && PathPrefix(`/seafhttp/`)
+        traefik.http.routers.seafile-fileserver.service: seafile-fileserver
+        traefik.http.services.seafile-fileserver.loadbalancer.server.port: ${SEAFILE_FILESERVER_PORT:-8082}
         traefik.http.middlewares.seafhttp-replace.replacepathregex.regex: ^/seafhttp/(.*)
         traefik.http.middlewares.seafhttp-replace.replacepathregex.replacement: /$$1
-        traefik.http.routers.seafile-files.middlewares: seafhttp-replace
+        traefik.http.routers.seafile-fileserver.middlewares: seafhttp-replace
       resources:
         limits:
           cpus: '${SEAFILE_RESOURCES_LIMITS_CPUS:-2}'
           memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-512M}
         reservations:
           cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.001}'
-          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-256M}
+          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-128M}
 
   mariadb:
     image: ${MARIADB_IMAGE_NAME:-linuxserver/mariadb}:${MARIADB_IMAGE_TAG:-latest}
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD:
       TZ:
+      MYSQL_ROOT_PASSWORD:
     networks:
       seafile-net:
         aliases:
@@ -93,17 +98,49 @@ networks:
 
 volumes:
   data-vol:
-    name: ${DATA_VOL_NAME:-seafile-shared-vol}
+    name: ${DATA_VOL_NAME:-seafile-mc-data-vol}
     driver: local
     driver_opts:
-      type: ${DATA_VOL_TYPE:-nfs}
+      type: ${DATA_VOL_TYPE}
       o: addr=${DATA_VOL_ADDR},${VOL_OPTIONS}
-      device: ${DATA_VOL_DEVICE:-:/seafile-shared-vol/}
+      device: ${DATA_VOL_DEVICE:-:/seafile-mc-data-vol/}
+
+  seahub-vol:
+    name: ${SEAHUB_VOL_NAME:-seafile-mc-seahub-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${SEAHUB_VOL_DEVICE:-:/seafile-mc-seahub-vol/}
+
+  conf-vol:
+    name: ${CONF_VOL_NAME:-seafile-mc-conf-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${CONF_VOL_DEVICE:-:/seafile-mc-conf-vol/}
+
+  logs-vol:
+    name: ${LOGS_VOL_NAME:-seafile-mc-logs-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${LOGS_VOL_DEVICE:-:/seafile-mc-logs-vol/}
+
+  media-vol:
+    name: ${MEDIA_VOL_NAME:-seafile-mc-media-vol}
+    driver: local
+    driver_opts:
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${MEDIA_VOL_DEVICE:-:/seafile-mc-media-vol/}
 
   db-vol:
-    name: ${DB_VOL_NAME:-seafile-mariadb-vol}
+    name: ${DB_VOL_NAME:-seafile-mc-db-vol}
     driver: local
     driver_opts:
-      type: ${DB_VOL_TYPE:-nfs4}
-      o: addr=${DB_VOL_ADDR},${VOL_OPTIONS}
-      device: ${DB_VOL_DEVICE:-:/seafile-mariadb-vol/}
+      type: ${VOL_TYPE}
+      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      device: ${DB_VOL_DEVICE:-:/seafile-mc-db-vol/}
