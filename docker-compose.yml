@@ -12,7 +12,7 @@ services:
       MYSQL_HOST: ${MARIADB_ALIAS}
       MYSQL_USER:
       MYSQL_USER_PASSWD:
-      MYSQL_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWD: ${MARIADB_ROOT_PASSWORD}
     networks:
       seafile-net:
       traefik-net:
@@ -48,23 +48,24 @@ services:
       resources:
         limits:
           cpus: '${SEAFILE_RESOURCES_LIMITS_CPUS:-2}'
-          memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-512M}
+          memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-1G}
         reservations:
           cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.001}'
-          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-128M}
+          memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-512M}
 
   mariadb:
-    image: ${MARIADB_IMAGE_NAME:-linuxserver/mariadb}:${MARIADB_IMAGE_TAG:-latest}
-    restart: always
+    image: ${MARIADB_IMAGE_NAME:-mariadb}:${MARIADB_IMAGE_TAG:-latest}
+    command:
+      - --skip-name-resolve
     environment:
-      TZ:
-      MYSQL_ROOT_PASSWORD:
+      MARIADB_ROOT_PASSWORD:
+      MARIADB_INITDB_SKIP_TZINFO:
     networks:
       seafile-net:
         aliases:
           - ${MARIADB_ALIAS}
     volumes:
-      - db-vol:/config
+      - db-vol:/var/lib/mysql
     deploy:
       mode: replicated
       replicas: 1
