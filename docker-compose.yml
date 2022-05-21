@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 services:
   seafile-mc:
@@ -32,25 +32,25 @@ services:
         delay: ${SEAFILE_UPDATE_DELAY:-1m}
       labels:
         traefik.enable: 'true'
-        traefik.http.routers.seafile-seahub.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
-        traefik.http.routers.seafile-seahub.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+
+        traefik.http.routers.seafile-seahub.entrypoints: ${TRAEFIK_ENTRYPOINT}
         traefik.http.routers.seafile-seahub.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`)
-        traefik.http.routers.seafile-seahub.service: seafile-seahub
         traefik.http.services.seafile-seahub.loadbalancer.server.port: ${SEAFILE_SEAHUB_PORT:-8000}
-        traefik.http.routers.seafile-fileserver.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
-        traefik.http.routers.seafile-fileserver.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-default}
+        traefik.http.routers.seafile-seahub.service: seafile-seahub
+
+        traefik.http.routers.seafile-fileserver.entrypoints: ${TRAEFIK_ENTRYPOINT}
         traefik.http.routers.seafile-fileserver.rule: Host(`${TRAEFIK_SUBDOMAIN}.${TRAEFIK_DOMAIN}`) && PathPrefix(`/seafhttp/`)
-        traefik.http.routers.seafile-fileserver.service: seafile-fileserver
-        traefik.http.services.seafile-fileserver.loadbalancer.server.port: ${SEAFILE_FILESERVER_PORT:-8082}
         traefik.http.middlewares.seafhttp-replace.replacepathregex.regex: ^/seafhttp/(.*)
         traefik.http.middlewares.seafhttp-replace.replacepathregex.replacement: /$$1
         traefik.http.routers.seafile-fileserver.middlewares: seafhttp-replace
+        traefik.http.services.seafile-fileserver.loadbalancer.server.port: ${SEAFILE_FILESERVER_PORT:-8082}
+        traefik.http.routers.seafile-fileserver.service: seafile-fileserver
       resources:
         limits:
           cpus: '${SEAFILE_RESOURCES_LIMITS_CPUS:-2}'
           memory: ${SEAFILE_RESOURCES_LIMITS_MEMORY:-1G}
         reservations:
-          cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          cpus: '${SEAFILE_RESOURCES_RESERVATIONS_CPUS:-0.1}'
           memory: ${SEAFILE_RESOURCES_RESERVATIONS_MEMORY:-512M}
 
   mariadb:
@@ -78,7 +78,7 @@ services:
           cpus: '${MARIADB_RESOURCES_LIMITS_CPUS:-0.5}'
           memory: ${MARIADB_RESOURCES_LIMITS_MEMORY:-128M}
         reservations:
-          cpus: '${MARIADB_RESOURCES_RESERVATIONS_CPUS:-0.001}'
+          cpus: '${MARIADB_RESOURCES_RESERVATIONS_CPUS:-0.1}'
           memory: ${MARIADB_RESOURCES_RESERVATIONS_MEMORY:-64M}
 
 networks:
@@ -103,7 +103,7 @@ volumes:
     driver: local
     driver_opts:
       type: ${DATA_VOL_TYPE}
-      o: addr=${DATA_VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${DATA_VOL_ADDR},${VOL_OPTS}
       device: ${DATA_VOL_DEVICE:-:/seafile-mc-data-vol/}
 
   seahub-vol:
@@ -111,7 +111,7 @@ volumes:
     driver: local
     driver_opts:
       type: ${VOL_TYPE}
-      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${VOL_ADDR},${VOL_OPTS}
       device: ${SEAHUB_VOL_DEVICE:-:/seafile-mc-seahub-vol/}
 
   conf-vol:
@@ -119,7 +119,7 @@ volumes:
     driver: local
     driver_opts:
       type: ${VOL_TYPE}
-      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${VOL_ADDR},${VOL_OPTS}
       device: ${CONF_VOL_DEVICE:-:/seafile-mc-conf-vol/}
 
   logs-vol:
@@ -127,7 +127,7 @@ volumes:
     driver: local
     driver_opts:
       type: ${VOL_TYPE}
-      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${VOL_ADDR},${VOL_OPTS}
       device: ${LOGS_VOL_DEVICE:-:/seafile-mc-logs-vol/}
 
   media-vol:
@@ -135,7 +135,7 @@ volumes:
     driver: local
     driver_opts:
       type: ${VOL_TYPE}
-      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${VOL_ADDR},${VOL_OPTS}
       device: ${MEDIA_VOL_DEVICE:-:/seafile-mc-media-vol/}
 
   db-vol:
@@ -143,5 +143,5 @@ volumes:
     driver: local
     driver_opts:
       type: ${VOL_TYPE}
-      o: addr=${VOL_ADDR},${VOL_OPTIONS}
+      o: addr=${VOL_ADDR},${VOL_OPTS}
       device: ${DB_VOL_DEVICE:-:/seafile-mc-db-vol/}
